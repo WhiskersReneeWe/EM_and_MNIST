@@ -1,4 +1,4 @@
-# Expectation-Maximization and MINIT 
+# Expectation-Maximization and MNIST 
 
 
 ## Introduction
