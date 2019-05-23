@@ -2,6 +2,7 @@ library(mnormt)
 library(matrixcalc)
 library(mvtnorm)
 library(slam)
+library(svMisc)
 
 load_mnist <- function() {
   load_image_file <- function(filename) {
@@ -108,12 +109,15 @@ for (i in 1:nrow(IMGS)) {
 mode(s_train_imgs) <- "integer"
 
 imgs = s_train_imgs / 255
+# sample 1000 imgs from the orginial imgs
+sampled_rows = sample(1:nrow(imgs), 1000, replace = TRUE)
+imgs = imgs[sampled_rows, ]
 set.seed(111109)
 
 ######## Initiation ############################################
 init_theta <- function(){
 # initialize mu_0, mu_1, ..., mu_4
- MU = matrix(, nrow = 5, ncol = 196)
+MU = matrix(, nrow = 5, ncol = 196)
 for (i in 1:5){
   MU[i, ] = matrix(sample(1:255, 196, replace=TRUE)/255)
 }
@@ -139,17 +143,6 @@ return (init_list)
 
 }
 
-inits = init_theta()
-###########################################################
-
-############ E-Step ###############
-
-p = inits[[3]] #p(z)
-MU = inits[[1]]
-cov_mats = inits[[2]]
-
-# initialize log-likelihood
-prevLLK = -1e300 
 
 Fij <- function(xi, pi=p, mu=MU, cov_var=cov_mats){
   # J -- cluster index
@@ -170,30 +163,49 @@ Fij <- function(xi, pi=p, mu=MU, cov_var=cov_mats){
 
 
 # Test Fij - Fij(img[1, ]) should give 5 probabilities that sum to 1: 
-#Fij(imgs[2, ], pi = p, mu = MU, cov_var = cov_mats)
-pi_rows = t(apply(imgs, 1, Fij))
+# sum(Fij(imgs[2, ], pi = p, mu = MU, cov_var = cov_mats)) == 1
 #Passed test
 
-# use Fij to calculate 
-for (iter in 1:10){
+inits = init_theta()
+p = inits[[3]] #p(z)
+MU = inits[[1]]
+cov_mats = inits[[2]]
+# initialize log-likelihood
+prevLLK = -1e300
+######## E-step ?########
+pi_rows = t(apply(imgs, 1, Fij))
+for (iter in 1:100){
+  progress(iter, progress.bar = TRUE)
+  Sys.sleep(0.01)
   
-  cat("starting iteration", iter)
   # update p, mu, cov_mats, with Fij
-  
-  # update MU
-  # use pi_t -- the matrix of Fif -- to update MU
+  ##################update MU
+  # use pi_rows -- the matrix of Fij -- to update MU
   MU = matrix(, nrow = 5, ncol = 196)
   for (j in 1:5){
     MU[j, ] = colSums(imgs * pi_rows[ ,j])/ sum(pi_rows[ ,j])
   }
   
-  # update p
-  # pi_t should be a matrix nrow(imgs) * 5
-  p = colSums(pi_rows) / nrow(pi_rows)  # p(z)
-  # update pi_rows
-  # pi_t = t(apply(imgs, 1, Fij))
+  # Alternative
+  # MU = matrix(, nrow = 5, ncol = 196)
+  # for (j in 1:5){
+  #   Fij_sum_t = 0
+  #   Fij_sum_b = 0
+  #   
+  #   for (i in 1:nrow(imgs)){
+  #   
+  #     Fij_sum_t = Fij_sum_t + Fij(imgs[i, ], pi = p, mu = MU, cov_var = cov_mats)[j] * imgs[i, ]
+  #     Fij_sum_b = Fij_sum_b + Fij(imgs[i, ], pi = p, mu = MU, cov_var = cov_mats)[j]
+  #   }
+  #   
+  #   MU[j, ] = Fij_sum_t / Fij_sum_b
+  #   
+  # }
   
-  # updates cov-mats
+  ############ update p
+  p = colSums(pi_rows) / nrow(pi_rows)  # p(z)
+  
+  ########### updates cov-mats
   cov_mats = list()
   vars = c()
   for (j in 1:5) {
@@ -205,7 +217,6 @@ for (iter in 1:10){
     cov_mats[[j]] = vars[j] * I_sph
   }
   
-  print('Hi, I updated variance covariance Matrix')
   # update pi_rows
   Fij_update <- function(xi){
     # J -- cluster index
@@ -227,8 +238,6 @@ for (iter in 1:10){
   # update pi_rows for next iteration
   pi_rows = t(apply(imgs, 1, Fij_update))
   
-  print('Hi, I am STILL AWAKE!')
-  
   # calculate log-likelihood
   ll = matrix( , nrow = nrow(imgs), ncol = 1)
   for (i in 1:nrow(imgs)){
@@ -238,13 +247,29 @@ for (iter in 1:10){
     }
     ll[i, ] = log(sum(inner_sum))
   }
-  print('Hi, Almost Finishing...')
+
   
   currLLK = sum(ll)
   # break the loop if converge - fractional change smaller than 0.0001
-  if ((currLLK - prevLLK)/abs(prevLLK) < 0.0001) {break}
-  
+  diff = abs(currLLK - prevLLK)
+  print(diff)
+  if (diff < 1e-8) {break}
+  print('No Break yet')
   prevLLK = currLLK
-  cat("Current Log-Likelihood: ", prevLLK)
-  sprintf("iteration %i completed", iter)
+  if (iter == 100) message('Done!')
+}
+
+########### Test ###############
+p = 0
+for (iter in 1:10){
+  progress(iter, 10, progress.bar = TRUE)
+  Sys.sleep(0.01)
+  p = p + 1
+  if (iter == 10) message('Done!')
+}
+
+for (i in 0:21) {
+  progress(i, 20, progress.bar = TRUE)
+  Sys.sleep(0.03)
+  if (i == 21) message("Done!")
 }
