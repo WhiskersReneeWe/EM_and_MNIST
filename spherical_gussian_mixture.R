@@ -177,7 +177,7 @@ pi_rows = t(apply(imgs, 1, Fij))
 # use Fij to calculate 
 for (iter in 1:10){
   
-  sprintf("iteration %i starting", iter)
+  cat("starting iteration", iter)
   # update p, mu, cov_mats, with Fij
   
   # update MU
@@ -205,6 +205,7 @@ for (iter in 1:10){
     cov_mats[[j]] = vars[j] * I_sph
   }
   
+  print('Hi, I updated variance covariance Matrix')
   # update pi_rows
   Fij_update <- function(xi){
     # J -- cluster index
@@ -226,6 +227,8 @@ for (iter in 1:10){
   # update pi_rows for next iteration
   pi_rows = t(apply(imgs, 1, Fij_update))
   
+  print('Hi, I am STILL AWAKE!')
+  
   # calculate log-likelihood
   ll = matrix( , nrow = nrow(imgs), ncol = 1)
   for (i in 1:nrow(imgs)){
@@ -235,12 +238,13 @@ for (iter in 1:10){
     }
     ll[i, ] = log(sum(inner_sum))
   }
+  print('Hi, Almost Finishing...')
   
   currLLK = sum(ll)
   # break the loop if converge - fractional change smaller than 0.0001
   if ((currLLK - prevLLK)/abs(prevLLK) < 0.0001) {break}
   
   prevLLK = currLLK
-  sprintf("current log-likelihood of all data is %i", prevLLK)
+  cat("Current Log-Likelihood: ", prevLLK)
   sprintf("iteration %i completed", iter)
 }
