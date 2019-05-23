@@ -11,3 +11,5 @@ There are lots of places to improve. Currently, I am running only for 10 iterati
 ## Resources 
 
 1. [Load MNIST data in R](https://gist.github.com/brendano/39760)
+2. [Useful notes 1](https://cslu.ohsu.edu/~bedricks/courses/cs655/pdf/addl_slides/pr813_lecture06.pdf)
+3. [Useful notes 2](http://ethen8181.github.io/machine-learning/clustering/GMM/GMM.html)
