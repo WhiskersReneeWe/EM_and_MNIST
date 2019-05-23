@@ -6,7 +6,11 @@ This is an assignment project in STA243 from UC Davis Statistic Department. The 
 
 ## Work in Progress
 
-There are lots of places to improve. Currently, I am running only for 10 iterations. I need to find a way to speed up the code. Just like anything else in life, implementing this algorithem is much more difficult than just nodding head during the lecture. It took me already 25 hours straight to write this current version. 
+There are lots of places to improve. Currently, I am running only for 100 iterations. I need to find a way to speed up the code. Just like anything else in life, implementing this algorithem is much more difficult than just nodding head during the lecture. It took me already 25 hours straight to write this current version. 
+
+I am writing this while waiting for the Convergence... my heart is pumping so hard, and I am not sure if I will ever see the Convergence...
+
+To be continued.
 
 ## Resources 
 
