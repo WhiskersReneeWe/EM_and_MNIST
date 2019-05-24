@@ -1,11 +1,11 @@
+
 library(mnormt)
 library(matrixcalc)
 library(mvtnorm)
 library(slam)
 library(svMisc)
 
-load_mnist <- function() {
-  load_image_file <- function(filename) {
+load_image_file <- function(filename) {
     ret = list()
     f = file(filename,'rb')
     readBin(f,'integer',n=1,size=4,endian='big')
@@ -17,7 +17,8 @@ load_mnist <- function() {
     close(f)
     ret
   }
-  load_label_file <- function(filename) {
+
+load_label_file <- function(filename) {
     f = file(filename,'rb')
     readBin(f,'integer',n=1,size=4,endian='big')
     n = readBin(f,'integer',n=1,size=4,endian='big')
@@ -25,14 +26,12 @@ load_mnist <- function() {
     close(f)
     y
   }
-  print('loading training images ...')
-  train_images<- load_image_file('train-images-idx3-ubyte')
-  #test <<- load_image_file('mnist/t10k-images-idx3-ubyte')
-  print('loading training labels')
-  train_labels <- load_label_file('train-labels-idx1-ubyte')
-  #test$y <<- load_label_file('mnist/t10k-labels-idx1-ubyte')  
-  print('Loading job done!')
-}
+
+ print('loading training images ...')
+ train_images <- load_image_file('train-images-idx3-ubyte')
+ print('loading training labels')
+ train_labels <- load_label_file('train-labels-idx1-ubyte')
+ print('Loading job done!')
 
 
 show_digit <- function(arr784, col=gray(12:1/12), ...) {
@@ -41,9 +40,8 @@ show_digit <- function(arr784, col=gray(12:1/12), ...) {
 
 ########### test check images and labels matching###############
 # train_images$x refers to all the images, where each image is a row vector 
-
-# train_imgs = train_images$x
-# show_digit(train_imgs[1,]) 
+train_imgs = train_images$x
+show_digit(train_imgs[1,]) 
 # train_labels[1]
 
 ########### Done checking and commenting this out ############
@@ -110,9 +108,10 @@ mode(s_train_imgs) <- "integer"
 
 imgs = s_train_imgs / 255
 # sample 1000 imgs from the orginial imgs
+
+set.seed(111109)
 sampled_rows = sample(1:nrow(imgs), 1000, replace = TRUE)
 imgs = imgs[sampled_rows, ]
-set.seed(111109)
 
 ######## Initiation ############################################
 init_theta <- function(){
@@ -129,7 +128,7 @@ I_sph = diag(1, 196, 196)
 cov_mats = list()
 vars = c()
 for (i in 1:5){
-  vars = c(vars, runif(1)^2)
+  vars = c(vars, runif(1)^2) + 0.05
   cov_mats[[i]] = vars[i] * I_sph
 }
 
@@ -144,18 +143,19 @@ return (init_list)
 }
 
 
-Fij <- function(xi, pi=p, mu=MU, cov_var=cov_mats){
+
+Fij <- function(xi, piii, MUUU, COVVV){
   # J -- cluster index
   Fi_j = c()
   
   F_ij_denom = 0
   for (j in 1:5){
-    F_ij_denom = F_ij_denom + pi[j] * dmvnorm(xi, mean = mu[j, ], sigma = cov_var[[j]])
+    F_ij_denom = F_ij_denom + piii[j] * dmvnorm(xi, mean = MUUU[j, ], sigma = COVVV[[j]])
   }
   
   for (j in 1:5){
-  top_g = pi[j] * dmvnorm(xi, mean = mu[j, ], sigma = cov_var[[j]])
-  Fi_j = c(Fi_j, top_g / F_ij_denom)
+    top_g = piii[j] * dmvnorm(xi, mean = MUUU[j, ], sigma = COVVV[[j]])
+    Fi_j = c(Fi_j, top_g / F_ij_denom)
   }
   
   return(Fi_j)
@@ -163,7 +163,7 @@ Fij <- function(xi, pi=p, mu=MU, cov_var=cov_mats){
 
 
 # Test Fij - Fij(img[1, ]) should give 5 probabilities that sum to 1: 
-# sum(Fij(imgs[2, ], pi = p, mu = MU, cov_var = cov_mats)) == 1
+#sum(Fij(imgs[2, ], p, MU, cov_mats)) == 1
 #Passed test
 
 inits = init_theta()
@@ -172,18 +172,23 @@ MU = inits[[1]]
 cov_mats = inits[[2]]
 # initialize log-likelihood
 prevLLK = -1e300
+tol = 1e-8
 ######## E-step ?########
-pi_rows = t(apply(imgs, 1, Fij))
+
 for (iter in 1:100){
   progress(iter, progress.bar = TRUE)
   Sys.sleep(0.01)
+  if (iter == 100) message('Done!')
   
-  # update p, mu, cov_mats, with Fij
-  ##################update MU
-  # use pi_rows -- the matrix of Fij -- to update MU
+  F_MAT = matrix(, nrow = nrow(imgs), 5)
+  
+  for (i in 1:nrow(imgs)){
+  F_MAT[i, ] = Fij(imgs[i, ], p, MU, cov_mats)
+  }
+  
   MU = matrix(, nrow = 5, ncol = 196)
   for (j in 1:5){
-    MU[j, ] = colSums(imgs * pi_rows[ ,j])/ sum(pi_rows[ ,j])
+    MU[j, ] = colSums(imgs * F_MAT[ ,j])/ sum(F_MAT[ ,j])
   }
   
   # Alternative
@@ -203,7 +208,7 @@ for (iter in 1:100){
   # }
   
   ############ update p
-  p = colSums(pi_rows) / nrow(pi_rows)  # p(z)
+  p = colSums(F_MAT) / nrow(F_MAT)  # p(z)
   
   ########### updates cov-mats
   cov_mats = list()
@@ -211,32 +216,14 @@ for (iter in 1:100){
   for (j in 1:5) {
     mean_j = matrix(1, nrow = nrow(imgs)) %*% MU[j, ]
     dev_j = imgs - mean_j # deviation in group 1
-    top_var_j = sum(pi_rows[ ,j] * row_norms(dev_j))
-    var_j = top_var_j / sum(pi_rows[ ,j])
-    vars = c(vars, var_j)
-    cov_mats[[j]] = vars[j] * I_sph
+    top_var_j = sum(F_MAT[ ,j] * row_norms(dev_j))
+    var_j = top_var_j / (196 * sum(F_MAT[ ,j]))
+    vars = c(vars, var_j) 
+    vars_added = vars + 0.05
+    cov_mats[[j]] = vars_added[j] * I_sph
   }
   
-  # update pi_rows
-  Fij_update <- function(xi){
-    # J -- cluster index
-    Fi_j = c()
-    
-    F_ij_denom = 0
-    for (j in 1:5){
-      F_ij_denom = F_ij_denom + p[j] * dmvnorm(xi, mean = MU[j, ], sigma = cov_mats[[j]])
-    }
-    
-    for (j in 1:5){
-      top_g = p[j] * dmvnorm(xi, mean = MU[j, ], sigma = cov_mats[[j]])
-      Fi_j = c(Fi_j, top_g / F_ij_denom)
-    }
-    
-    return(Fi_j)
-  }
-  
-  # update pi_rows for next iteration
-  pi_rows = t(apply(imgs, 1, Fij_update))
+
   
   # calculate log-likelihood
   ll = matrix( , nrow = nrow(imgs), ncol = 1)
@@ -250,26 +237,7 @@ for (iter in 1:100){
 
   
   currLLK = sum(ll)
-  # break the loop if converge - fractional change smaller than 0.0001
-  diff = abs(currLLK - prevLLK)
-  print(diff)
-  if (diff < 1e-8) {break}
-  print('No Break yet')
-  prevLLK = currLLK
-  if (iter == 100) message('Done!')
-}
+  print(currLLK)
+  prevLLK <- currLLK
 
-########### Test ###############
-p = 0
-for (iter in 1:10){
-  progress(iter, 10, progress.bar = TRUE)
-  Sys.sleep(0.01)
-  p = p + 1
-  if (iter == 10) message('Done!')
-}
-
-for (i in 0:21) {
-  progress(i, 20, progress.bar = TRUE)
-  Sys.sleep(0.03)
-  if (i == 21) message("Done!")
 }
